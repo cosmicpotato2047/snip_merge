@@ -9,7 +9,7 @@ class FileSelectScreen extends StatefulWidget {
 
 class _FileSelectScreenState extends State<FileSelectScreen> {
   late final int fileCount;
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -21,7 +21,7 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
       fileCount = 2; // 인자가 없으면 기본값 2로 설정.
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,7 +71,11 @@ class _MP3FileCardState extends State<MP3FileCard> {
   String? fileName;
   // 예제에서는 총 길이를 100초로 가정. 실제 구현 시 파일 길이에 따라 설정하면 됨.
   RangeValues trimValues = const RangeValues(0, 100);
-  
+
+  bool adjustStart = true;
+  static const double minimalGap = 1.0;
+  static const double maxDuration = 100.0;
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -93,7 +97,10 @@ class _MP3FileCardState extends State<MP3FileCard> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 24,
+                  ),
                   textStyle: const TextStyle(fontSize: 16),
                 ),
                 onPressed: () {
@@ -128,27 +135,55 @@ class _MP3FileCardState extends State<MP3FileCard> {
               activeColor: const Color(0xFF81D4FA), // pastel blue/mint tint
               inactiveColor: Colors.grey.shade300,
               // 파일이 선택된 경우에만 활성화
-              onChanged: isFileSelected
-                  ? (values) {
-                      setState(() {
-                        trimValues = values;
-                      });
-                    }
-                  : null,
+              onChanged:
+                  isFileSelected
+                      ? (values) {
+                        setState(() {
+                          trimValues = values;
+                        });
+                      }
+                      : null,
               labels: RangeLabels(
                 "${trimValues.start.toStringAsFixed(0)}s",
                 "${trimValues.end.toStringAsFixed(0)}s",
               ),
             ),
             const SizedBox(height: 8),
-            // 3. 슬라이더 값 조정용 네비게이션 버튼들
+            // 3. Start/End 조정 버튼들
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildNavButton("-1s", -1),
-                _buildNavButton("-0.5s", -0.5),
-                _buildNavButton("+0.5s", 0.5),
-                _buildNavButton("+1s", 1),
+                // 1) Start/End 토글
+                ToggleButtons(
+                  isSelected: [adjustStart, !adjustStart],
+                  borderRadius: BorderRadius.circular(8),
+                  onPressed: (i) => setState(() => adjustStart = (i == 0)),
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('Start'),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('End'),
+                    ),
+                  ],
+                ),
+
+                // 2) 네비게이션 버튼들
+                //    Expanded로 감싸서 남는 공간만큼 버튼 그룹이 고르게 퍼지도록
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildNavButton("-1s", -1),
+                      _buildNavButton("-0.5s", -0.5),
+                      _buildNavButton("+0.5s", 0.5),
+                      _buildNavButton("+1s", 1),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -156,15 +191,17 @@ class _MP3FileCardState extends State<MP3FileCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildPreviewButton("▶ Start 0–3s", () {
+                _buildPreviewButton("▶ Play start–3s", () {
                   // 실제 구현 시 오디오 플레이어 연동
-                  debugPrint("Preview Start 0–3s for file ${widget.index + 1}");
-                }),
-                _buildPreviewButton("▶ End -3s", () {
-                  debugPrint("Preview End -3s for file ${widget.index + 1}");
+                  debugPrint(
+                    "Preview Play start–3s for file ${widget.index + 1}",
+                  );
                 }),
                 _buildPreviewButton("▶ Play All", () {
                   debugPrint("Play All for file ${widget.index + 1}");
+                }),
+                _buildPreviewButton("▶ Play -3s-end", () {
+                  debugPrint("Preview Play -3s-end file ${widget.index + 1}");
                 }),
               ],
             ),
@@ -173,48 +210,40 @@ class _MP3FileCardState extends State<MP3FileCard> {
       ),
     );
   }
-  
+
   // 네비게이션 버튼 생성 함수
   Widget _buildNavButton(String label, double offset) {
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFFFCCBC), // peach/light orange pastel
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        textStyle: const TextStyle(fontSize: 14),
-      ),
-      onPressed: isFileSelected
-          ? () {
-              setState(() {
-                // offset을 추가해 슬라이더 값을 조절 (경계값 체크 포함)
-                double newStart = (trimValues.start + offset).clamp(0, trimValues.end - 1);
-                double newEnd = (trimValues.end + offset).clamp(trimValues.start + 1, 100);
-                trimValues = RangeValues(newStart, newEnd);
-              });
-            }
-          : null,
+      onPressed:
+          isFileSelected
+              ? () {
+                setState(() {
+                  double s = trimValues.start;
+                  double e = trimValues.end;
+                  if (adjustStart) {
+                    s = (s + offset).clamp(0.0, e - minimalGap);
+                  } else {
+                    e = (e + offset).clamp(s + minimalGap, maxDuration);
+                  }
+                  trimValues = RangeValues(s, e);
+                });
+              }
+              : null,
       child: Text(label),
     );
   }
-  
+
   // 미리 듣기 버튼 생성 함수
   Widget _buildPreviewButton(String label, VoidCallback onPressed) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFFD1C4E9), // lavender pastel
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         textStyle: const TextStyle(fontSize: 12),
       ),
       onPressed: isFileSelected ? onPressed : null,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-      ),
+      child: Text(label, textAlign: TextAlign.center),
     );
   }
 }
