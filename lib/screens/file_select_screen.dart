@@ -69,7 +69,13 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
 /// MP3 파일 카드 위젯
 class MP3FileCard extends StatefulWidget {
   final int index;
-  const MP3FileCard({required this.index, super.key});
+  final void Function(String name, Duration start, Duration end) onTrimChanged;
+
+  const MP3FileCard({
+    required this.index,
+    required this.onTrimChanged,
+    super.key,
+  });
 
   @override
   State<MP3FileCard> createState() => _MP3FileCardState();
@@ -84,6 +90,29 @@ class _MP3FileCardState extends State<MP3FileCard> {
   bool adjustStart = true;
   static const double minimalGap = 1.0;
   static const double maxDuration = 100.0;
+
+  void _selectFile() {
+    setState(() {
+      isFileSelected = true;
+      fileName = 'audio_${widget.index + 1}.mp3';
+    });
+    _notifyParent();
+  }
+
+  void _updateTrim(RangeValues newValues) {
+    setState(() => trimValues = newValues);
+    _notifyParent();
+  }
+
+  void _notifyParent() {
+    if (fileName != null) {
+      widget.onTrimChanged(
+        fileName!,
+        Duration(seconds: trimValues.start.toInt()),
+        Duration(seconds: trimValues.end.toInt()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +147,12 @@ class _MP3FileCardState extends State<MP3FileCard> {
                     isFileSelected = true;
                     fileName = "audio_file_${widget.index + 1}.mp3";
                   });
+                  // 부모에게 선택,트림 상태를 알려주는 호출
+                  widget.onTrimChanged(
+                    fileName!,
+                    Duration(seconds: trimValues.start.toInt()),
+                    Duration(seconds: trimValues.end.toInt()),
+                  );
                 },
                 child: const Text("Select File"),
               ),
@@ -145,13 +180,7 @@ class _MP3FileCardState extends State<MP3FileCard> {
               inactiveColor: Colors.grey.shade300,
               // 파일이 선택된 경우에만 활성화
               onChanged:
-                  isFileSelected
-                      ? (values) {
-                        setState(() {
-                          trimValues = values;
-                        });
-                      }
-                      : null,
+                  isFileSelected ? (values) => _updateTrim(values) : null,
               labels: RangeLabels(
                 "${trimValues.start.toStringAsFixed(0)}s",
                 "${trimValues.end.toStringAsFixed(0)}s",
@@ -349,15 +378,8 @@ Future<bool?> showConfirmMergeDialog(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () async {
-                        // trimmedFiles 리스트는 MP3FileCard 각 State에서 수집해 두었다고 가정
-                        final confirmed = await showConfirmMergeDialog(
-                          context//,
-                          // trimmedFiles,
-                        );
-                        if (confirmed == true) {
-                          Navigator.pushNamed(context, '/result');
-                        }
+                      onPressed: () {
+                        Navigator.of(ctx).pop(true);
                       },
 
                       child: const Text(
