@@ -9,17 +9,16 @@ class FileSelectScreen extends StatefulWidget {
 
 class _FileSelectScreenState extends State<FileSelectScreen> {
   late final int fileCount;
+  final List<TrimmedFile?> trimmedFiles = [];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Start Screen에서 전달된 파일 개수를 argument로 받아옴.
     final args = ModalRoute.of(context)!.settings.arguments;
-    if (args is int) {
-      fileCount = args;
-    } else {
-      fileCount = 2; // 인자가 없으면 기본값 2로 설정.
-    }
+    fileCount = (args is int) ? args : 2;
+    trimmedFiles
+      ..clear()
+      ..addAll(List.filled(fileCount, null));
   }
 
   @override
@@ -30,8 +29,14 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: fileCount,
-        itemBuilder: (context, index) {
-          return MP3FileCard(index: index);
+        itemBuilder: (ctx, idx) {
+          return MP3FileCard(
+            index: idx,
+            onTrimChanged: (name, start, end) {
+              // 카드에서 전달된 데이터 저장
+              trimmedFiles[idx] = TrimmedFile(name, start, end);
+            },
+          );
         },
       ),
       // Merge Files 버튼은 하단에 고정
@@ -40,15 +45,19 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFA7C7E7), // pastel tone
+            padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
             textStyle: const TextStyle(fontSize: 18),
           ),
-          onPressed: () {
-            // Merge Files 기능 구현 후 결과 화면으로 연결
-            Navigator.pushNamed(context, '/result');
+          onPressed: () async {
+            // null이 아닌 카드만 골라서 다이얼로그 호출
+            final files = trimmedFiles.whereType<TrimmedFile>().toList();
+            final confirmed = await showConfirmMergeDialog(context, files);
+            if (confirmed == true) {
+              Navigator.pushNamed(context, '/result', arguments: files);
+            }
           },
           child: const Text("Merge Files"),
         ),
