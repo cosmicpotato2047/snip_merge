@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/start_screen.dart';
 import 'screens/file_select_screen.dart';
-import 'screens/result_screen.dart';
+import 'screens/merge_result_screen.dart';
 
 void main() {
   runApp(const SnipMergeApp());
@@ -33,13 +33,27 @@ class SnipMergeApp extends StatelessWidget {
         // tested with just a hot reload.
         fontFamily: 'Sans', // 이후 구글 폰트 추가 가능
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,        
+        useMaterial3: true,
       ),
       initialRoute: '/',
       routes: {
         '/': (context) => const StartScreen(),
         '/file_select': (context) => const FileSelectScreen(),
-        '/result': (context) => const ResultScreen(),
+        // '/result' 경로는 arguments를 꺼내서 화면을 생성
+        '/result': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments;
+          if (args is Map<String, String>) {
+            return MergeResultScreen(
+              fileName: args['fileName']!,
+              filePath: args['filePath']!,
+            );
+          }
+          // 안전망: arguments가 없으면 빈 값 넣어주거나 기본 화면
+          return const MergeResultScreen(
+            fileName: 'unknown.mp3',
+            filePath: '/unknown/',
+          );
+        },
       },
     );
   }
