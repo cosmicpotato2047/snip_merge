@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/start_screen.dart';
 import 'screens/file_select_screen.dart';
 import 'screens/merge_result_screen.dart';
 
 void main() {
-  runApp(const SnipMergeApp());
+  runApp(
+    const ProviderScope(
+      child: SnipMergeApp(),
+    ),
+  );
 }
 
 class SnipMergeApp extends StatelessWidget {
