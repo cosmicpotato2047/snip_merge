@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trimmed_file.dart';
+import '../providers/file_merge_provider.dart';
 
 /// MP3 파일 카드 위젯
-class MP3FileCard extends StatefulWidget {
+class MP3FileCard extends ConsumerStatefulWidget {
   final int index;
-  final void Function(String name, Duration start, Duration end) onTrimChanged;
 
-  const MP3FileCard({
-    required this.index,
-    required this.onTrimChanged,
-    super.key,
-  });
+  const MP3FileCard({required this.index, Key? key}) : super(key: key);
 
   @override
-  State<MP3FileCard> createState() => _MP3FileCardState();
+  ConsumerState<MP3FileCard> createState() => _MP3FileCardState();
 }
 
-class _MP3FileCardState extends State<MP3FileCard> {
+class _MP3FileCardState extends ConsumerState<MP3FileCard> {
   bool isFileSelected = false;
   String? fileName;
   // 예제에서는 총 길이를 100초로 가정. 실제 구현 시 파일 길이에 따라 설정하면 됨.
@@ -40,13 +37,14 @@ class _MP3FileCardState extends State<MP3FileCard> {
   }
 
   void _notifyParent() {
-    if (fileName != null) {
-      widget.onTrimChanged(
-        fileName!,
-        Duration(seconds: trimValues.start.toInt()),
-        Duration(seconds: trimValues.end.toInt()),
-      );
-    }
+    if (!isFileSelected || fileName == null) return;
+    final file = TrimmedFile(
+      fileName!,
+      Duration(seconds: trimValues.start.toInt()),
+      Duration(seconds: trimValues.end.toInt()),
+    );
+    // Provider에 바로 반영
+    ref.read(trimmedFileListProvider.notifier).update(widget.index, file);
   }
 
   @override
@@ -83,11 +81,16 @@ class _MP3FileCardState extends State<MP3FileCard> {
                     fileName = "audio_file_${widget.index + 1}.mp3";
                   });
                   // 부모에게 선택,트림 상태를 알려주는 호출
-                  widget.onTrimChanged(
-                    fileName!,
-                    Duration(seconds: trimValues.start.toInt()),
-                    Duration(seconds: trimValues.end.toInt()),
-                  );
+                  ref
+                      .read(trimmedFileListProvider.notifier)
+                      .update(
+                        widget.index,
+                        TrimmedFile(
+                          fileName!,
+                          Duration(seconds: trimValues.start.toInt()),
+                          Duration(seconds: trimValues.end.toInt()),
+                        ),
+                      );
                 },
                 child: const Text("Select File"),
               ),
@@ -115,11 +118,22 @@ class _MP3FileCardState extends State<MP3FileCard> {
               inactiveColor: Colors.grey.shade300,
               // 파일이 선택된 경우에만 활성화
               onChanged:
-                  isFileSelected ? (values) => _updateTrim(values) : null,
-              labels: RangeLabels(
-                "${trimValues.start.toStringAsFixed(0)}s",
-                "${trimValues.end.toStringAsFixed(0)}s",
-              ),
+                  isFileSelected
+                      ? (values) {
+                        setState(() => trimValues = values);
+                        // trim 값이 바뀔 때마다 프로바이더 업데이트
+                        ref
+                            .read(trimmedFileListProvider.notifier)
+                            .update(
+                              widget.index,
+                              TrimmedFile(
+                                fileName!,
+                                Duration(seconds: values.start.toInt()),
+                                Duration(seconds: values.end.toInt()),
+                              ),
+                            );
+                      }
+                      : null,
             ),
             const SizedBox(height: 8),
             // 3. Start/End 조정 버튼들
@@ -200,6 +214,17 @@ class _MP3FileCardState extends State<MP3FileCard> {
                   }
                   trimValues = RangeValues(s, e);
                 });
+                // 이동 후에도 업데이트
+                ref
+                    .read(trimmedFileListProvider.notifier)
+                    .update(
+                      widget.index,
+                      TrimmedFile(
+                        fileName!,
+                        Duration(seconds: trimValues.start.toInt()),
+                        Duration(seconds: trimValues.end.toInt()),
+                      ),
+                    );
               }
               : null,
       child: Text(label),
@@ -220,4 +245,3 @@ class _MP3FileCardState extends State<MP3FileCard> {
     );
   }
 }
-

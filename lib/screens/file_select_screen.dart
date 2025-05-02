@@ -44,12 +44,6 @@ class _FileSelectScreenState extends ConsumerState<FileSelectScreen> {
         itemBuilder: (ctx, idx) {
           return MP3FileCard(
             index: idx,
-            onTrimChanged: (name, start, end) {
-              // 상태 업데이트
-              ref
-                  .read(trimmedFileListProvider.notifier)
-                  .update(idx, TrimmedFile(name, start, end));
-            },
           );
         },
       ),
