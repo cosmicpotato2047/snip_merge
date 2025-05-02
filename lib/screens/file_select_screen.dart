@@ -1,31 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:snip_merge/providers/file_merge_provider.dart';
 import '../models/trimmed_file.dart';
 import '../widgets/mp3_file_card.dart';
 import '../widgets/confirm_merge_dialog.dart';
+import '../providers/merge_status_provider.dart'; // trimmedFileListProvider
 
-class FileSelectScreen extends StatefulWidget {
-  const FileSelectScreen({super.key});
+class FileSelectScreen extends ConsumerStatefulWidget {
+  const FileSelectScreen({Key? key}) : super(key: key);
 
   @override
-  State<FileSelectScreen> createState() => _FileSelectScreenState();
+  ConsumerState<FileSelectScreen> createState() => _FileSelectScreenState();
 }
 
-class _FileSelectScreenState extends State<FileSelectScreen> {
+class _FileSelectScreenState extends ConsumerState<FileSelectScreen> {
   late final int fileCount;
-  final List<TrimmedFile?> trimmedFiles = [];
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments;
-    fileCount = (args is int) ? args : 2;
-    trimmedFiles
-      ..clear()
-      ..addAll(List.filled(fileCount, null));
+    if (!_initialized) {
+      final args = ModalRoute.of(context)!.settings.arguments;
+      fileCount = (args is int) ? args : 2;
+      // Riverpod 프로바이더 초기화
+      ref.read(trimmedFileListProvider.notifier).init(fileCount);
+      _initialized = true;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Riverpod에서 관리되는 파일 리스트 & 유효 여부
+    final files = ref.watch(trimmedFileListProvider);
+    final allSelected = files.every((f) => f.isValid);
+
     return Scaffold(
       appBar: AppBar(title: const Text("Select and Trim Files")),
       backgroundColor: const Color(0xFFF8FAFB), // off-white pastel background
@@ -36,8 +45,10 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
           return MP3FileCard(
             index: idx,
             onTrimChanged: (name, start, end) {
-              // 카드에서 전달된 데이터 저장
-              trimmedFiles[idx] = TrimmedFile(name, start, end);
+              // 상태 업데이트
+              ref
+                  .read(trimmedFileListProvider.notifier)
+                  .update(idx, TrimmedFile(name, start, end));
             },
           );
         },
@@ -54,14 +65,25 @@ class _FileSelectScreenState extends State<FileSelectScreen> {
             ),
             textStyle: const TextStyle(fontSize: 18),
           ),
-          onPressed: () async {
-            // null이 아닌 카드만 골라서 다이얼로그 호출
-            final files = trimmedFiles.whereType<TrimmedFile>().toList();
-            final confirmed = await showConfirmMergeDialog(context, files);
-            if (confirmed == true) {
-              Navigator.pushNamed(context, '/result', arguments: files);
-            }
-          },
+          onPressed:
+              allSelected
+                  ? () async {
+                    final confirmed = await showConfirmMergeDialog(
+                      context,
+                      files,
+                    );
+                    if (confirmed == true) {
+                      Navigator.pushNamed(
+                        context,
+                        '/result',
+                        arguments: {
+                          'fileName': 'merged.mp3',
+                          'filePath': '/Music/SnipMerge/',
+                        },
+                      );
+                    }
+                  }
+                  : null,
           child: const Text("Merge Files"),
         ),
       ),
